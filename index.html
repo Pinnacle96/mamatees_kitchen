@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mama Tee's Kitchen — Dashboard</title>
+<style>
+  :root {
+    --orange: #D85A30;
+    --orange-light: #FAECE7;
+    --orange-dark: #993C1D;
+    --bg: #F7F5F2;
+    --surface: #FFFFFF;
+    --border: #E8E4DF;
+    --text: #1A1714;
+    --muted: #7A746E;
+    --blue-bg: #E6F1FB; --blue-text: #185FA5;
+    --green-bg: #EAF3DE; --green-text: #3B6D11;
+    --amber-bg: #FAEEDA; --amber-text: #854F0B;
+    --red-bg: #FCEBEB; --red-text: #A32D2D;
+    --purple-bg: #EEEDFE; --purple-text: #534AB7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 24px; height: 60px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand-icon { width: 34px; height: 34px; background: var(--orange); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .brand-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .brand-sub { font-size: 11px; color: var(--muted); }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .live { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #3B6D11; background: var(--green-bg); padding: 4px 10px; border-radius: 20px; }
+  .live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .refresh-btn { font-size: 12px; padding: 6px 14px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); cursor: pointer; color: var(--muted); }
+  .refresh-btn:hover { background: var(--bg); }
+  .last-updated { font-size: 11px; color: var(--muted); }
+
+  .main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+  .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .metric { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .metric-value { font-size: 28px; font-weight: 600; line-height: 1; color: var(--text); }
+  .metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .metric.highlight .metric-value { color: var(--orange); }
+
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media(max-width:600px){ .charts-row { grid-template-columns: 1fr; } }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .card-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .bar-label { font-size: 12px; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+  .bar-num { font-size: 12px; font-weight: 600; color: var(--text); width: 28px; text-align: right; }
+
+  .res-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .res-label { font-size: 12px; color: var(--muted); width: 110px; flex-shrink: 0; }
+  .res-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+  .res-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(.4,0,.2,1); }
+  .res-pct { font-size: 12px; font-weight: 600; color: var(--text); width: 36px; text-align: right; }
+
+  .log-section { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .log-header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+  .log-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fbtn { font-size: 11px; padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+  .fbtn.active { background: var(--orange); color: #fff; border-color: var(--orange); }
+  .fbtn:hover:not(.active) { background: var(--bg); }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; background: var(--bg); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #FBF9F7; }
+  td { padding: 11px 16px; vertical-align: middle; }
+  .td-name { font-weight: 500; color: var(--text); white-space: nowrap; }
+  .td-detail { color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .td-time { color: var(--muted); white-space: nowrap; font-size: 12px; }
+  .td-area { color: var(--muted); font-size: 12px; }
+
+  .badge { display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .b-order { background: var(--blue-bg); color: var(--blue-text); }
+  .b-reservation { background: var(--green-bg); color: var(--green-text); }
+  .b-faq { background: var(--amber-bg); color: var(--amber-text); }
+  .b-callback { background: var(--red-bg); color: var(--red-text); }
+  .b-other { background: var(--bg); color: var(--muted); }
+  .b-new { background: var(--blue-bg); color: var(--blue-text); }
+  .b-pending { background: var(--amber-bg); color: var(--amber-text); }
+  .b-completed { background: var(--green-bg); color: var(--green-text); }
+  .b-contacted { background: var(--purple-bg); color: var(--purple-text); }
+
+  .empty { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .loading { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
+  .error-msg { background: var(--red-bg); color: var(--red-text); padding: 12px 20px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+  .config-banner { background: var(--amber-bg); border: 1px solid #FAC775; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--amber-text); display: none; }
+  .config-banner a { color: var(--amber-text); font-weight: 600; }
+
+  .footer { text-align: center; padding: 24px; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">🍽</div>
+    <div>
+      <div class="brand-name">Mama Tee's Kitchen</div>
+      <div class="brand-sub">Voice concierge dashboard</div>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <span class="last-updated" id="last-updated">Loading...</span>
+    <div class="live"><span class="live-dot"></span>Live</div>
+    <button class="refresh-btn" onclick="fetchData()">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="config-banner" id="config-banner">
+    ⚠️ Dashboard is showing <strong>sample data</strong>. To connect live data, update the <code>N8N_URL</code> at the top of this file with your n8n webhook URL.
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="metrics" id="metrics">
+    <div class="loading">Loading metrics...</div>
+  </div>
+
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">Calls by intent</div>
+      <div id="intent-chart"><div class="loading">Loading...</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Resolution overview</div>
+      <div id="resolution-chart"><div class="loading">Loading...</div></div>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-header">
+      <span class="log-title">Recent calls</span>
+      <div class="filters" id="filters"></div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Customer</th>
+            <th>Details</th>
+            <th>Intent</th>
+            <th>Area</th>
+            <th>Status</th>
+            <th>Resolution</th>
+          </tr>
+        </thead>
+        <tbody id="log-body">
+          <tr><td colspan="7" class="loading">Loading call logs...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">Mama Tee's Kitchen · AI Voice Concierge · Auto-refreshes every 30 seconds</div>
+
+<script>
+  // ============================================================
+  // CONFIGURATION — REPLACE THIS WITH YOUR n8n WEBHOOK URL
+  // After importing the n8n JSON, copy the GET webhook URL here
+  // Example: https://pinnacletech.app.n8n.cloud/webhook/mamatee-dashboard-data
+  // ============================================================
+  const N8N_URL = 'https://pinnacletech.app.n8n.cloud/webhook/mamatee-dashboard-data';
+  // ============================================================
+
+  const SAMPLE_DATA = {
+    stats: { total: 12, orders: 5, reservations: 2, faqs: 3, callbacks: 2, resolutionRate: 83 },
+    logs: [
+      { timestamp:"2026-05-13T14:55:00Z", customer_name:"Kemi Adeleke", customer_phone:"08055667788", intent_type:"order", order_or_reservation_details:"Sunday Family Deal x2, delivery", delivery_area:"Gwarinpa", status:"completed", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T14:20:00Z", customer_name:"Abdullahi Diko", customer_phone:"07011223300", intent_type:"callback_request", order_or_reservation_details:"", unhandled_question:"Wedding catering enquiry", delivery_area:"", status:"pending", assistant_resolution:"callback_needed" },
+      { timestamp:"2026-05-13T13:52:00Z", customer_name:"Chioma Nwosu", customer_phone:"08099112233", intent_type:"order", order_or_reservation_details:"Amala + Ewedu, Beef, pickup", delivery_area:"Pickup", status:"new", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T13:15:00Z", customer_name:"Tunde Bakare", customer_phone:"09022334455", intent_type:"faq", order_or_reservation_details:"Friday catfish special enquiry", delivery_area:"", status:"completed", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T12:40:00Z", customer_name:"Blessing Adamu", customer_phone:"07077889900", intent_type:"reservation", order_or_reservation_details:"5 guests, Friday 7pm", delivery_area:"", status:"new", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T12:05:00Z", customer_name:"Ibrahim Musa", customer_phone:"08033445566", intent_type:"order", order_or_reservation_details:"Fried Rice large, 1 Fish, delivery", delivery_area:"Wuse 2", status:"completed", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T11:33:00Z", customer_name:"Ngozi Eze", customer_phone:"08065544332", intent_type:"faq", order_or_reservation_details:"Halal certification enquiry", delivery_area:"", status:"completed", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T11:10:00Z", customer_name:"Unknown", customer_phone:"07099887766", intent_type:"callback_request", order_or_reservation_details:"", unhandled_question:"Corporate catering packages", delivery_area:"", status:"pending", assistant_resolution:"callback_needed" },
+      { timestamp:"2026-05-13T10:45:00Z", customer_name:"Yusuf Garba", customer_phone:"09011223344", intent_type:"order", order_or_reservation_details:"Pounded Yam + Egusi, Goat Meat", delivery_area:"Garki", status:"new", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T10:02:00Z", customer_name:"Fatima Sule", customer_phone:"08122334455", intent_type:"reservation", order_or_reservation_details:"7 guests, Saturday 2pm", delivery_area:"", status:"new", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T09:38:00Z", customer_name:"Chukwudi Obi", customer_phone:"07054321098", intent_type:"faq", order_or_reservation_details:"Opening hours Sunday", delivery_area:"", status:"completed", assistant_resolution:"resolved" },
+      { timestamp:"2026-05-13T09:14:00Z", customer_name:"Amina Bello", customer_phone:"08031234567", intent_type:"order", order_or_reservation_details:"Large Jollof Rice, 2 Chicken", delivery_area:"Maitama", status:"completed", assistant_resolution:"resolved" }
+    ]
+  };
+
+  let activeFilter = 'all';
+  let currentData = null;
+
+  function formatTime(ts) {
+    if (!ts) return '—';
+    try {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) + ' · ' + d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+    } catch(e) { return ts.toString().slice(0,16); }
+  }
+
+  function intentBadge(intent) {
+    const map = { order:'b-order', reservation:'b-reservation', faq:'b-faq', callback_request:'b-callback', other:'b-other' };
+    const labels = { order:'Order', reservation:'Reservation', faq:'FAQ', callback_request:'Callback', other:'Other' };
+    return `<span class="badge ${map[intent]||'b-other'}">${labels[intent]||intent}</span>`;
+  }
+
+  function statusBadge(status) {
+    const map = { new:'b-new', pending:'b-pending', completed:'b-completed', contacted:'b-contacted' };
+    return `<span class="badge ${map[status]||'b-new'}">${status||'new'}</span>`;
+  }
+
+  function renderMetrics(stats) {
+    document.getElementById('metrics').innerHTML = `
+      <div class="metric"><div class="metric-label">Total calls</div><div class="metric-value">${stats.total}</div><div class="metric-sub">All time</div></div>
+      <div class="metric highlight"><div class="metric-label">Orders</div><div class="metric-value">${stats.orders}</div><div class="metric-sub">Captured</div></div>
+      <div class="metric"><div class="metric-label">Reservations</div><div class="metric-value">${stats.reservations}</div><div class="metric-sub">Logged</div></div>
+      <div class="metric"><div class="metric-label">FAQs</div><div class="metric-value">${stats.faqs}</div><div class="metric-sub">Resolved</div></div>
+      <div class="metric"><div class="metric-label">Callbacks</div><div class="metric-value">${stats.callbacks}</div><div class="metric-sub">Pending</div></div>
+      <div class="metric"><div class="metric-label">Auto-resolved</div><div class="metric-value">${stats.resolutionRate}%</div><div class="metric-sub">By Tee</div></div>
+    `;
+  }
+
+  function renderIntentChart(logs) {
+    const counts = { order:0, faq:0, reservation:0, callback_request:0 };
+    logs.forEach(r => { if (counts[r.intent_type] !== undefined) counts[r.intent_type]++; });
+    const max = Math.max(...Object.values(counts), 1);
+    const colors = { order:'#378ADD', faq:'#EF9F27', reservation:'#639922', callback_request:'#E24B4A' };
+    const labels = { order:'Orders', faq:'FAQs', reservation:'Reservations', callback_request:'Callbacks' };
+    document.getElementById('intent-chart').innerHTML = Object.entries(counts).map(([k,v]) => `
+      <div class="bar-row">
+        <span class="bar-label">${labels[k]}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(v/max*100)}%;background:${colors[k]}"></div></div>
+        <span class="bar-num">${v}</span>
+      </div>`).join('');
+  }
+
+  function renderResolutionChart(logs) {
+    const total = logs.length || 1;
+    const resolved = logs.filter(r => r.assistant_resolution === 'resolved').length;
+    const callback = logs.filter(r => r.assistant_resolution === 'callback_needed').length;
+    const newCount = logs.filter(r => r.status === 'new').length;
+    const pending = logs.filter(r => r.status === 'pending').length;
+    const completed = logs.filter(r => r.status === 'completed').length;
+    document.getElementById('resolution-chart').innerHTML = `
+      <div class="res-row"><span class="res-label">Auto-resolved</span><div class="res-track"><div class="res-fill" style="width:${Math.round(resolved/total*100)}%;background:#639922"></div></div><span class="res-pct">${Math.round(resolved/total*100)}%</span></div>
+      <div class="res-row"><span class="res-label">Callback needed</span><div class="res-track"><div class="res-fill" style="width:${Math.round(callback/total*100)}%;background:#E24B4A"></div></div><span class="res-pct">${Math.round(callback/total*100)}%</span></div>
+      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+      <div class="res-row"><span class="res-label">New</span><div class="res-track"><div class="res-fill" style="width:${Math.round(newCount/total*100)}%;background:#378ADD"></div></div><span class="res-pct">${newCount}</span></div>
+      <div class="res-row"><span class="res-label">Pending</span><div class="res-track"><div class="res-fill" style="width:${Math.round(pending/total*100)}%;background:#EF9F27"></div></div><span class="res-pct">${pending}</span></div>
+      <div class="res-row"><span class="res-label">Completed</span><div class="res-track"><div class="res-fill" style="width:${Math.round(completed/total*100)}%;background:#639922"></div></div><span class="res-pct">${completed}</span></div>
+    `;
+  }
+
+  function renderFilters() {
+    const intents = ['all','order','reservation','faq','callback_request'];
+    const labels = { all:'All', order:'Orders', reservation:'Reservations', faq:'FAQs', callback_request:'Callbacks' };
+    document.getElementById('filters').innerHTML = intents.map(i =>
+      `<button class="fbtn${i===activeFilter?' active':''}" onclick="setFilter('${i}')">${labels[i]}</button>`
+    ).join('');
+  }
+
+  function renderLogs(logs) {
+    const filtered = activeFilter === 'all' ? logs : logs.filter(r => r.intent_type === activeFilter);
+    if (!filtered.length) {
+      document.getElementById('log-body').innerHTML = `<tr><td colspan="7" class="empty">No calls found for this filter</td></tr>`;
+      return;
+    }
+    const detail = (row) => row.order_or_reservation_details || row.unhandled_question || '—';
+    document.getElementById('log-body').innerHTML = filtered.map(row => `
+      <tr>
+        <td class="td-time">${formatTime(row.timestamp)}</td>
+        <td><div class="td-name">${row.customer_name || 'Unknown'}</div><div style="font-size:11px;color:var(--muted)">${row.customer_phone || row.caller_phone || ''}</div></td>
+        <td class="td-detail" title="${detail(row)}">${detail(row)}</td>
+        <td>${intentBadge(row.intent_type)}</td>
+        <td class="td-area">${row.delivery_area || '—'}</td>
+        <td>${statusBadge(row.status)}</td>
+        <td><span style="font-size:11px;color:${row.assistant_resolution==='resolved'?'var(--green-text)':'var(--amber-text)'}">${row.assistant_resolution==='resolved'?'✓ Resolved':'↩ Callback'}</span></td>
+      </tr>`).join('');
+  }
+
+  function setFilter(f) {
+    activeFilter = f;
+    renderFilters();
+    if (currentData) renderLogs(currentData.logs);
+  }
+
+  function render(data) {
+    currentData = data;
+    renderMetrics(data.stats);
+    renderIntentChart(data.logs);
+    renderResolutionChart(data.logs);
+    renderFilters();
+    renderLogs(data.logs);
+    document.getElementById('last-updated').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function fetchData() {
+    if (N8N_URL === 'YOUR_N8N_DASHBOARD_WEBHOOK_URL_HERE') {
+      document.getElementById('config-banner').style.display = 'block';
+      render(SAMPLE_DATA);
+      return;
+    }
+    try {
+      const res = await fetch(N8N_URL);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      document.getElementById('error-msg').style.display = 'none';
+      render(data);
+    } catch(err) {
+      document.getElementById('error-msg').style.display = 'block';
+      document.getElementById('error-msg').textContent = '⚠️ Could not load live data: ' + err.message + '. Showing sample data.';
+      render(SAMPLE_DATA);
+    }
+  }
+
+  fetchData();
+  setInterval(fetchData, 30000);
+</script>
+</body>
+</html>
