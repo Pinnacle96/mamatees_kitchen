@@ -224,7 +224,7 @@
 
   .main-content {
     flex: 1;
-    margin-left: var(--sidebar-width);
+    margin-left: 0;
     transition: var(--transition);
   }
 
@@ -310,7 +310,7 @@
   }
 
   .content-wrapper {
-    padding: 24px;
+    padding: 16px;
   }
 
   .content-section {
@@ -332,7 +332,7 @@
 
   .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: 1fr;
     gap: 16px;
     margin-bottom: 24px;
   }
@@ -415,7 +415,7 @@
 
   .charts-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: 1fr;
     gap: 20px;
     margin-bottom: 24px;
   }
@@ -562,7 +562,7 @@
   }
 
   .data-table th {
-    padding: 16px 24px;
+    padding: 12px 16px;
     text-align: left;
     font-size: 12px;
     font-weight: 600;
@@ -575,7 +575,7 @@
   }
 
   .data-table td {
-    padding: 16px 24px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border-light);
     vertical-align: middle;
   }
@@ -708,7 +708,7 @@
   }
 
   .footer {
-    padding: 20px 24px;
+    padding: 16px;
     border-top: 1px solid var(--border);
     text-align: center;
     font-size: 12px;
@@ -717,7 +717,7 @@
   }
 
   .mobile-menu-btn {
-    display: none;
+    display: flex;
     width: 40px;
     height: 40px;
     border-radius: 8px;
@@ -730,64 +730,87 @@
     font-size: 20px;
   }
 
-  @media (max-width: 1024px) {
-    .sidebar {
-      transform: translateX(-100%);
-    }
-    
-    .sidebar.active {
-      transform: translateX(0);
-    }
-    
-    .main-content {
-      margin-left: 0;
-    }
-    
-    .mobile-menu-btn {
-      display: flex;
-    }
-    
-    .charts-grid {
-      grid-template-columns: 1fr;
-    }
+  .sidebar {
+    transform: translateX(-100%);
   }
 
-  @media (max-width: 768px) {
+  .sidebar.active {
+    transform: translateX(0);
+  }
+
+  .table-header {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+
+  .table-filters {
+    flex-wrap: wrap;
+  }
+
+  @media (min-width: 600px) {
     .metrics-grid {
       grid-template-columns: repeat(2, 1fr);
     }
-    
+  }
+
+  @media (min-width: 768px) {
     .header {
-      padding: 0 16px;
+      padding: 0 24px;
     }
-    
+
     .content-wrapper {
-      padding: 16px;
+      padding: 24px;
     }
-    
+
+    .data-table th,
+    .data-table td {
+      padding: 16px 24px;
+    }
+
+    .footer {
+      padding: 20px 24px;
+    }
+  }
+
+  @media (min-width: 1025px) {
+    .sidebar {
+      transform: translateX(0);
+    }
+
+    .sidebar-overlay {
+      display: none;
+    }
+
+    .main-content {
+      margin-left: var(--sidebar-width);
+    }
+
+    .mobile-menu-btn {
+      display: none;
+    }
+
+    .metrics-grid {
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
+    .charts-grid {
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+
     .table-header {
-      flex-direction: column;
-      gap: 12px;
-      align-items: stretch;
+      flex-direction: row;
+      align-items: center;
     }
-    
+
     .table-filters {
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
   }
 
   @media (max-width: 480px) {
-    .metrics-grid {
-      grid-template-columns: 1fr;
-    }
-    
     .status-badge {
       display: none;
-    }
-    
-    .data-table th,
-    .data-table td {
-      padding: 12px 16px;
     }
   }
 
@@ -1029,6 +1052,7 @@
 
 <script>
   const N8N_URL = "https://pinnacletech.app.n8n.cloud/webhook/mamatee-dashboard-data";
+  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTnbiJLAGs4nWmqYbwDvPFfh3AXMh8_IdFzXLiMHAfmEWSzcgJQqDnmLv44QcNLpMFsefW3u9aoAGU4/pub?output=csv";
   
   let activeFilter = "all";
   let currentData = null;
@@ -1451,47 +1475,183 @@
     };
   }
 
+  function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const next = text[i + 1];
+      if (inQuotes) {
+        if (char === '"' && next === '"') {
+          cell += '"';
+          i++;
+        } else if (char === '"') {
+          inQuotes = false;
+        } else {
+          cell += char;
+        }
+        continue;
+      }
+
+      if (char === '"') {
+        inQuotes = true;
+        continue;
+      }
+
+      if (char === ',') {
+        row.push(cell);
+        cell = '';
+        continue;
+      }
+
+      if (char === '\n') {
+        row.push(cell);
+        rows.push(row);
+        row = [];
+        cell = '';
+        continue;
+      }
+
+      if (char === '\r') {
+        continue;
+      }
+
+      cell += char;
+    }
+
+    if (cell.length || row.length) {
+      row.push(cell);
+      rows.push(row);
+    }
+
+    return rows.filter(r => r.some(c => (c ?? '').toString().trim() !== ''));
+  }
+
+  function csvToObjects(csvText) {
+    const rows = parseCsv(csvText);
+    if (!rows.length) return [];
+
+    const headers = rows[0].map(h => (h ?? '').toString().trim());
+    const dataRows = rows.slice(1);
+
+    const toKey = (h) => (h || '').toString().trim();
+
+    return dataRows.map((r) => {
+      const obj = {};
+      headers.forEach((h, idx) => {
+        obj[toKey(h)] = (r[idx] ?? '').toString();
+      });
+      return obj;
+    });
+  }
+
+  function normalizeSheetRows(rows) {
+    const norm = (v) => (v ?? '').toString().trim();
+    const fallback = (obj, keys) => {
+      for (const k of keys) {
+        const val = norm(obj[k]);
+        if (val) return val;
+      }
+      return '';
+    };
+
+    const mapped = rows.map((r) => {
+      const intent = fallback(r, ['intent_type', 'intent', 'Intent', 'Intent Type']);
+      const status = fallback(r, ['status', 'Status']) || 'new';
+      return {
+        timestamp: fallback(r, ['timestamp', 'Timestamp', 'time', 'Time']),
+        call_id: fallback(r, ['call_id', 'Call ID', 'callId']),
+        caller_phone: fallback(r, ['caller_phone', 'Caller Phone', 'caller']),
+        customer_name: fallback(r, ['customer_name', 'Customer Name', 'name']),
+        customer_phone: fallback(r, ['customer_phone', 'Customer Phone', 'phone']),
+        intent_type: intent || 'other',
+        order_or_reservation_details: fallback(r, ['order_or_reservation_details', 'Details', 'details']),
+        delivery_or_pickup: fallback(r, ['delivery_or_pickup', 'Delivery/Pickup', 'delivery_or_pickup']),
+        delivery_area: fallback(r, ['delivery_area', 'Area', 'Delivery Area']),
+        delivery_address: fallback(r, ['delivery_address', 'Address', 'Delivery Address']),
+        requested_datetime: fallback(r, ['requested_datetime', 'Requested Datetime', 'requested_time']),
+        party_size: fallback(r, ['party_size', 'Party Size']),
+        unhandled_question: fallback(r, ['unhandled_question', 'Question', 'Unhandled Question']),
+        assistant_resolution: fallback(r, ['assistant_resolution', 'Resolution', 'assistant_resolution']),
+        status
+      };
+    });
+
+    const meaningful = mapped.filter((r) => {
+      return [
+        r.timestamp,
+        r.call_id,
+        r.caller_phone,
+        r.customer_name,
+        r.customer_phone,
+        r.order_or_reservation_details,
+        r.delivery_or_pickup,
+        r.delivery_area,
+        r.delivery_address,
+        r.requested_datetime,
+        r.party_size,
+        r.unhandled_question,
+        r.assistant_resolution
+      ].some((v) => norm(v));
+    });
+
+    return meaningful;
+  }
+
   async function fetchData() {
     try {
-      const response = await fetch(N8N_URL, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
+      let allLogs = [];
+      let recentLogs = [];
+
+      try {
+        const response = await fetch(`${SHEET_CSV_URL}&_ts=${Date.now()}`, { method: 'GET', cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const text = await response.text();
+        const trimmed = text.trim();
+        if (!trimmed || trimmed.startsWith('<')) {
+          throw new Error('Published sheet did not return CSV.');
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+        const rawRows = csvToObjects(text);
+        allLogs = normalizeSheetRows(rawRows);
+        recentLogs = allLogs.slice(-50).reverse();
+      } catch (sheetErr) {
+        const response = await fetch(N8N_URL, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
 
-      const raw = await response.json();
-      console.log('RAW N8N RESPONSE:', raw);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-      let logs = [];
+        const raw = await response.json();
 
-      if (Array.isArray(raw)) {
-        if (raw.length && raw[0].timestamp) {
-          logs = raw;
-        } else if (raw[0]?.json?.logs) {
-          logs = raw[0].json.logs;
-        } else if (raw[0]?.logs) {
-          logs = raw[0].logs;
+        let logs = [];
+        if (Array.isArray(raw)) {
+          if (raw.length && raw[0]?.timestamp) logs = raw;
+          else if (raw[0]?.json?.logs) logs = raw[0].json.logs;
+          else if (raw[0]?.logs) logs = raw[0].logs;
+        } else if (raw?.logs) {
+          logs = raw.logs;
+        } else if (raw?.data) {
+          logs = raw.data;
+        } else if (raw?.timestamp) {
+          logs = [raw];
         }
-      } else if (raw.logs) {
-        logs = raw.logs;
-      } else if (raw.data) {
-        logs = raw.data;
-      } else if (raw.timestamp) {
-        logs = [raw];
-      }
 
-      if (!Array.isArray(logs)) {
-        throw new Error('Logs data is not an array');
+        if (!Array.isArray(logs)) {
+          throw new Error('Logs data is not an array');
+        }
+
+        allLogs = logs;
+        recentLogs = logs;
       }
 
       const data = {
-        stats: buildStats(logs),
-        logs: logs
+        stats: buildStats(allLogs),
+        logs: recentLogs
       };
 
       currentData = data;
@@ -1513,13 +1673,22 @@
           <span class="material-icons-round" style="color: var(--error); font-size: 24px">error</span>
           <div>
             <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px">
-              Failed to fetch live data
+              Failed to load Google Sheet data
             </div>
             <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px">
               Error: ${error.message}
             </div>
             <div style="font-size: 12px; color: var(--text-secondary)">
-              Check: n8n workflow is active • webhook URL is correct • CORS is enabled
+              If you want “direct sheet”:
+              <div style="margin-top: 6px; line-height: 1.6;">
+                1) Ensure this opens a CSV in your browser:
+                <br>
+                <span style="word-break: break-all;">${SHEET_CSV_URL}</span>
+                <br>
+                2) Some browsers block Google Sheets CSV with CORS. If that happens, the dashboard automatically falls back to n8n:
+                <br>
+                <span style="word-break: break-all;">${N8N_URL}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1557,7 +1726,7 @@
           <td colspan="7" class="empty-state">
             <div class="empty-icon material-icons-round">cloud_off</div>
             <div class="empty-title">No live data</div>
-            <div class="empty-subtitle">Check your n8n connection and try again</div>
+            <div class="empty-subtitle">Check your Google Sheet access and try again</div>
           </td>
         </tr>
       `;
