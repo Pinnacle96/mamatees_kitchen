@@ -1859,9 +1859,17 @@
       } catch (n8nErr) {
         console.warn('n8n fetch failed, falling back to Google Sheets CSV:', n8nErr);
         
-        // Fallback to Google Sheet CSV (using a CORS proxy to prevent browser blocks)
-        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(`${SHEET_CSV_URL}&_ts=${Date.now()}`);
-        const response = await fetch(proxyUrl, { method: 'GET', cache: 'no-store' });
+        // Try fetching the raw CSV first (some proxies block if they detect vercel/netlify referers)
+        // We'll use a more reliable proxy setup specifically for Google Sheets
+        const proxyUrl1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(`${SHEET_CSV_URL}&_ts=${Date.now()}`)}`;
+        
+        let response = await fetch(proxyUrl1, { method: 'GET', cache: 'no-store' });
+        
+        if (!response.ok) {
+          // If first proxy fails, try a direct fetch as fallback (some browsers might allow it)
+          response = await fetch(`${SHEET_CSV_URL}&_ts=${Date.now()}`, { method: 'GET', cache: 'no-store' });
+        }
+        
         if (!response.ok) throw new Error(`CSV HTTP ${response.status}`);
 
         const text = await response.text();
