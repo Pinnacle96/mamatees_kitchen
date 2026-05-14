@@ -1131,7 +1131,7 @@
 
 <script>
   const N8N_URL = "https://pinnacletech.app.n8n.cloud/webhook/mamatee-dashboard-data";
-  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTnbiJLAGs4nWmqYbwDvPFfh3AXMh8_IdFzXLiMHAfmEWSzcgJQqDnmLv44QcNLpMFsefW3u9aoAGU4/pub?output=csv";
+  const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1zkgC_Ab_qbMuYd4CrvZZKH0yquU2K14C8U87XtvssCM/edit?gid=0";
   let activeFilter = "all";
   let currentData = null;
   let isDarkMode = false;
@@ -1859,18 +1859,25 @@
       } catch (n8nErr) {
         console.warn('n8n fetch failed, falling back to Google Sheets CSV:', n8nErr);
         
-        // Try fetching the raw CSV first (some proxies block if they detect vercel/netlify referers)
-        // We'll use a more reliable proxy setup specifically for Google Sheets
-        const proxyUrl1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(`${SHEET_CSV_URL}&_ts=${Date.now()}`)}`;
+        // Use Google Visualization API query as it natively supports CORS and JSONP
+        // This is the most reliable way to read Google Sheets from a browser without proxies
+        const gidMatch = SHEET_CSV_URL.match(/gid=([0-9]+)/);
+        const gid = gidMatch ? gidMatch[1] : "0";
+        const sheetIdMatch = SHEET_CSV_URL.match(/\/d\/([a-zA-Z0-9-_]+)/);
         
-        let response = await fetch(proxyUrl1, { method: 'GET', cache: 'no-store' });
+        if (!sheetIdMatch) throw new Error("Invalid Google Sheets URL format");
         
-        if (!response.ok) {
-          // If first proxy fails, try a direct fetch as fallback (some browsers might allow it)
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetIdMatch[1]}/gviz/tq?tqx=out:csv&gid=${gid}&_ts=${Date.now()}`;
+        
+        let response;
+        try {
+          response = await fetch(gvizUrl, { method: 'GET', cache: 'no-store' });
+        } catch (e) {
+          // If gviz fails, fallback to direct pub?output=csv (works if sheet is published)
           response = await fetch(`${SHEET_CSV_URL}&_ts=${Date.now()}`, { method: 'GET', cache: 'no-store' });
         }
         
-        if (!response.ok) throw new Error(`CSV HTTP ${response.status}`);
+        if (!response.ok) throw new Error(`Google Sheets HTTP ${response.status}`);
 
         const text = await response.text();
         const trimmed = text.trim();
