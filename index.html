@@ -82,9 +82,22 @@
     transition: var(--transition);
   }
 
+  .page-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .page-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
   .app-container {
     display: flex;
     min-height: 100vh;
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   .sidebar {
@@ -224,6 +237,7 @@
 
   .main-content {
     flex: 1;
+    min-width: 0;
     margin-left: 0;
     transition: var(--transition);
   }
@@ -515,8 +529,28 @@
     padding: 20px 24px;
     border-bottom: 1px solid var(--border);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .table-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .table-meta {
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .table-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    margin-top: 12px;
   }
 
   .table-title {
@@ -528,6 +562,37 @@
   .table-filters {
     display: flex;
     gap: 8px;
+  }
+
+  .date-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .date-input {
+    padding: 6px 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .page-info {
+    font-size: 13px;
+    color: var(--text-secondary);
+    white-space: nowrap;
   }
 
   .filter-btn {
@@ -738,16 +803,6 @@
     transform: translateX(0);
   }
 
-  .table-header {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
-  }
-
-  .table-filters {
-    flex-wrap: wrap;
-  }
-
   @media (min-width: 600px) {
     .metrics-grid {
       grid-template-columns: repeat(2, 1fr);
@@ -801,6 +856,13 @@
     .table-header {
       flex-direction: row;
       align-items: center;
+      justify-content: space-between;
+    }
+
+    .table-controls {
+      width: auto;
+      margin-top: 0;
+      align-items: flex-end;
     }
 
     .table-filters {
@@ -888,7 +950,10 @@
         <button class="mobile-menu-btn" id="mobileMenuBtn">
           <span class="material-icons-round">menu</span>
         </button>
-        <h1 class="page-title">Dashboard Overview</h1>
+        <div class="page-title-wrap">
+          <h1 class="page-title">Dashboard Overview</h1>
+          <div class="page-subtitle" id="pageSubtitle"></div>
+        </div>
       </div>
       
       <div class="header-right">
@@ -1000,8 +1065,22 @@
       <section class="content-section" id="calls-section" data-nav="calls-section">
       <div class="data-table-section">
         <div class="table-header">
-          <h3 class="table-title">Recent Calls</h3>
-          <div class="table-filters" id="filters"></div>
+          <div class="table-title-wrap">
+            <h3 class="table-title">Call Logs</h3>
+            <div class="table-meta" id="tableMeta"></div>
+          </div>
+
+          <div class="table-controls">
+            <div class="table-filters" id="filters"></div>
+
+            <div class="date-controls">
+              <button class="filter-btn" id="todayBtn" type="button">Today</button>
+              <button class="filter-btn" id="allDatesBtn" type="button">All</button>
+              <input class="date-input" id="dateFilter" type="date" />
+            </div>
+
+            <div class="pagination" id="pagination"></div>
+          </div>
         </div>
         
         <div class="table-container">
@@ -1053,10 +1132,20 @@
 <script>
   const N8N_URL = "https://pinnacletech.app.n8n.cloud/webhook/mamatee-dashboard-data";
   const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTnbiJLAGs4nWmqYbwDvPFfh3AXMh8_IdFzXLiMHAfmEWSzcgJQqDnmLv44QcNLpMFsefW3u9aoAGU4/pub?output=csv";
-  
   let activeFilter = "all";
   let currentData = null;
   let isDarkMode = false;
+  let activeDate = null;
+  let currentPage = 1;
+  const pageSize = 10;
+  const dom = {
+    pageSubtitle: null,
+    dateFilterEl: null,
+    todayBtn: null,
+    allDatesBtn: null,
+    paginationEl: null,
+    tableMetaEl: null
+  };
 
   document.addEventListener('DOMContentLoaded', function() {
     const mobileMenuBtn = document.getElementById('mobileMenuBtn');
@@ -1064,10 +1153,19 @@
     const sidebarOverlay = document.getElementById('sidebarOverlay');
     const themeToggleNav = document.getElementById('themeToggleNav');
     const pageTitle = document.querySelector('.page-title');
+    dom.pageSubtitle = document.getElementById('pageSubtitle');
     const navItems = Array.from(document.querySelectorAll('.sidebar-nav .nav-item'));
     const sections = Array.from(document.querySelectorAll('[data-nav]'));
+    dom.dateFilterEl = document.getElementById('dateFilter');
+    dom.todayBtn = document.getElementById('todayBtn');
+    dom.allDatesBtn = document.getElementById('allDatesBtn');
+    dom.paginationEl = document.getElementById('pagination');
+    dom.tableMetaEl = document.getElementById('tableMeta');
 
     document.body.setAttribute('data-theme', 'light');
+
+    activeDate = getTodayYmd();
+    if (dom.dateFilterEl) dom.dateFilterEl.value = activeDate;
 
     const setActiveNav = (targetId) => {
       navItems.forEach((item) => {
@@ -1112,6 +1210,28 @@
         isDarkMode = !isDarkMode;
         document.body.setAttribute('data-theme', isDarkMode ? 'dark' : 'light');
         updateThemeToggleUi();
+      });
+    }
+
+    if (dom.todayBtn) dom.todayBtn.addEventListener('click', () => setActiveDate(getTodayYmd()));
+    if (dom.allDatesBtn) dom.allDatesBtn.addEventListener('click', () => setActiveDate(null));
+    if (dom.dateFilterEl) {
+      dom.dateFilterEl.addEventListener('change', () => {
+        const v = (dom.dateFilterEl.value || '').trim();
+        if (!v) return;
+        setActiveDate(v);
+      });
+    }
+
+    if (dom.paginationEl) {
+      dom.paginationEl.addEventListener('click', (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+        const action = target.getAttribute('data-page-action');
+        if (!action) return;
+        if (action === 'prev') currentPage = Math.max(1, currentPage - 1);
+        if (action === 'next') currentPage = currentPage + 1;
+        updateView();
       });
     }
 
@@ -1166,11 +1286,87 @@
     setInterval(fetchData, 30000);
   });
 
+  function toYmd(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
+  function getTodayYmd() {
+    return toYmd(new Date());
+  }
+
+  function setActiveDate(ymdOrNull) {
+    activeDate = ymdOrNull;
+    currentPage = 1;
+    if (dom.dateFilterEl && ymdOrNull) dom.dateFilterEl.value = ymdOrNull;
+    updateView();
+  }
+
+  function updateView() {
+    const allLogs = Array.isArray(currentData?.allLogs) ? currentData.allLogs : [];
+    const todayYmd = getTodayYmd();
+
+    const logsByDate = activeDate
+      ? allLogs.filter((row) => {
+          const d = safeParseDate(row.timestamp);
+          return d ? toYmd(d) === activeDate : false;
+        })
+      : allLogs;
+
+    const periodLabel = activeDate
+      ? (activeDate === todayYmd ? 'Happening today' : `Showing ${activeDate}`)
+      : 'All time';
+
+    if (dom.pageSubtitle) {
+      dom.pageSubtitle.textContent = `${periodLabel} • ${logsByDate.length} call${logsByDate.length === 1 ? '' : 's'}`;
+    }
+
+    renderMetrics(buildStats(logsByDate), periodLabel);
+    renderIntentChart(logsByDate);
+    renderResolutionChart(logsByDate);
+    renderFilters();
+
+    const intentFiltered = activeFilter === 'all'
+      ? logsByDate
+      : logsByDate.filter((row) => (row.intent_type || 'other') === activeFilter);
+
+    const sorted = [...intentFiltered].sort((a, b) => (safeParseDate(b.timestamp)?.getTime() || 0) - (safeParseDate(a.timestamp)?.getTime() || 0));
+    const totalItems = sorted.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+    currentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+    const start = (currentPage - 1) * pageSize;
+    const pageItems = sorted.slice(start, start + pageSize);
+
+    renderLogs(pageItems);
+    renderPagination(totalItems, totalPages);
+
+    if (dom.tableMetaEl) {
+      const dateLabel = activeDate ? activeDate : 'All dates';
+      const intentLabel = activeFilter === 'all' ? 'All intents' : activeFilter;
+      dom.tableMetaEl.textContent = `${dateLabel} • ${intentLabel} • ${totalItems} result${totalItems === 1 ? '' : 's'}`;
+    }
+
+    if (dom.todayBtn) dom.todayBtn.classList.toggle('active', activeDate === todayYmd);
+    if (dom.allDatesBtn) dom.allDatesBtn.classList.toggle('active', activeDate === null);
+  }
+
+  function safeParseDate(value) {
+    const s = (value ?? '').toString().trim();
+    if (!s) return null;
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return d;
+  }
+
   function formatTime(timestamp) {
     if (!timestamp) return "—";
     
     try {
-      const date = new Date(timestamp);
+      const date = safeParseDate(timestamp);
+      if (!date) return timestamp;
       const now = new Date();
       const diffMs = now - date;
       const diffMins = Math.floor(diffMs / 60000);
@@ -1190,6 +1386,7 @@
 
   function renderMetrics(stats) {
     const metricsContainer = document.getElementById('metrics');
+    const period = arguments.length > 1 ? arguments[1] : 'All time';
     metricsContainer.innerHTML = `
       <div class="metric-card highlight">
         <div class="metric-header">
@@ -1197,7 +1394,7 @@
           <span class="metric-icon material-icons-round">call</span>
         </div>
         <div class="metric-value">${stats.total}</div>
-        <div class="metric-sub">All time</div>
+        <div class="metric-sub">${period}</div>
       </div>
       
       <div class="metric-card">
@@ -1368,13 +1565,9 @@
   }
 
   function renderLogs(logs) {
-    const filtered = activeFilter === 'all' 
-      ? logs 
-      : logs.filter(row => (row.intent_type || 'other') === activeFilter);
-    
     const tableBody = document.getElementById('log-body');
     
-    if (!filtered.length) {
+    if (!logs.length) {
       tableBody.innerHTML = `
         <tr>
           <td colspan="7" class="empty-state">
@@ -1387,7 +1580,7 @@
       return;
     }
     
-    tableBody.innerHTML = filtered.map(row => {
+    tableBody.innerHTML = logs.map(row => {
       const detail = row.order_or_reservation_details || row.unhandled_question || '—';
       const area = row.delivery_area || '—';
       const phone = row.customer_phone || row.caller_phone || '';
@@ -1453,10 +1646,11 @@
 
   function setFilter(filter) {
     activeFilter = filter;
+    currentPage = 1;
     renderFilters();
-    
+
     if (currentData) {
-      renderLogs(currentData.logs);
+      updateView();
     }
   }
 
@@ -1473,6 +1667,29 @@
           )
         : 0
     };
+  }
+
+  function renderPagination(totalItems, totalPages) {
+    const paginationEl = document.getElementById('pagination');
+    if (!paginationEl) return;
+
+    if (totalItems === 0) {
+      paginationEl.innerHTML = '';
+      return;
+    }
+
+    const prevDisabled = currentPage <= 1;
+    const nextDisabled = currentPage >= totalPages;
+
+    paginationEl.innerHTML = `
+      <button class="chart-action-btn" type="button" data-page-action="prev" ${prevDisabled ? 'disabled' : ''} aria-label="Previous page" title="Previous page">
+        <span class="material-icons-round">chevron_left</span>
+      </button>
+      <div class="page-info">Page ${currentPage} of ${totalPages}</div>
+      <button class="chart-action-btn" type="button" data-page-action="next" ${nextDisabled ? 'disabled' : ''} aria-label="Next page" title="Next page">
+        <span class="material-icons-round">chevron_right</span>
+      </button>
+    `;
   }
 
   function parseCsv(text) {
@@ -1606,27 +1823,19 @@
       let recentLogs = [];
 
       try {
-        const response = await fetch(`${SHEET_CSV_URL}&_ts=${Date.now()}`, { method: 'GET', cache: 'no-store' });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const text = await response.text();
-        const trimmed = text.trim();
-        if (!trimmed || trimmed.startsWith('<')) {
-          throw new Error('Published sheet did not return CSV.');
-        }
-
-        const rawRows = csvToObjects(text);
-        allLogs = normalizeSheetRows(rawRows);
-        recentLogs = allLogs.slice(-50).reverse();
-      } catch (sheetErr) {
+        // Try n8n first
         const response = await fetch(N8N_URL, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
 
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (!response.ok) throw new Error(`n8n HTTP ${response.status}`);
 
         const raw = await response.json();
+
+        if (raw && raw.message === "Workflow was started") {
+          throw new Error('n8n webhook is not returning data (Response Mode issue)');
+        }
 
         let logs = [];
         if (Array.isArray(raw)) {
@@ -1641,27 +1850,43 @@
           logs = [raw];
         }
 
-        if (!Array.isArray(logs)) {
-          throw new Error('Logs data is not an array');
+        if (!Array.isArray(logs) || logs.length === 0) {
+          throw new Error('Logs data is empty or invalid from n8n');
         }
 
         allLogs = logs;
         recentLogs = logs;
+      } catch (n8nErr) {
+        console.warn('n8n fetch failed, falling back to Google Sheets CSV:', n8nErr);
+        
+        // Fallback to Google Sheet CSV (using a CORS proxy to prevent browser blocks)
+        const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(`${SHEET_CSV_URL}&_ts=${Date.now()}`);
+        const response = await fetch(proxyUrl, { method: 'GET', cache: 'no-store' });
+        if (!response.ok) throw new Error(`CSV HTTP ${response.status}`);
+
+        const text = await response.text();
+        const trimmed = text.trim();
+        if (!trimmed || trimmed.startsWith('<')) {
+          throw new Error('Published sheet did not return CSV.');
+        }
+
+        const rawRows = csvToObjects(text);
+        allLogs = normalizeSheetRows(rawRows);
+        recentLogs = allLogs.slice(-50).reverse();
       }
 
-      const data = {
-        stats: buildStats(allLogs),
-        logs: recentLogs
-      };
-
-      currentData = data;
+      currentData = { allLogs };
       
       document.getElementById('error-msg').style.display = 'none';
-      renderMetrics(data.stats);
-      renderIntentChart(data.logs);
-      renderResolutionChart(data.logs);
-      renderFilters();
-      renderLogs(data.logs);
+      if (typeof updateView === 'function') {
+        updateView();
+      } else {
+        renderMetrics(buildStats(allLogs), 'All time');
+        renderIntentChart(recentLogs);
+        renderResolutionChart(recentLogs);
+        renderFilters();
+        renderLogs(recentLogs);
+      }
 
     } catch (error) {
       console.error(error);
@@ -1673,21 +1898,20 @@
           <span class="material-icons-round" style="color: var(--error); font-size: 24px">error</span>
           <div>
             <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px">
-              Failed to load Google Sheet data
+              Failed to load Dashboard data
             </div>
             <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px">
               Error: ${error.message}
             </div>
             <div style="font-size: 12px; color: var(--text-secondary)">
-              If you want “direct sheet”:
               <div style="margin-top: 6px; line-height: 1.6;">
-                1) Ensure this opens a CSV in your browser:
-                <br>
-                <span style="word-break: break-all;">${SHEET_CSV_URL}</span>
-                <br>
-                2) Some browsers block Google Sheets CSV with CORS. If that happens, the dashboard automatically falls back to n8n:
+                The dashboard first tried fetching from n8n:
                 <br>
                 <span style="word-break: break-all;">${N8N_URL}</span>
+                <br><br>
+                And then fell back to Google Sheets CSV, which also failed:
+                <br>
+                <span style="word-break: break-all;">${SHEET_CSV_URL}</span>
               </div>
             </div>
           </div>
